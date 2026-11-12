@@ -1,26 +1,456 @@
+
 @import "tailwindcss";
 
+/* =========================================
+   DROPNEST — GLOBAL DESIGN SYSTEM
+========================================= */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+  --background: #050505;
+  --foreground: #ffffff;
+  --surface: #0b0b0b;
+  --surface-light: #141414;
+  --border: rgba(255, 255, 255, 0.11);
+  --muted: #929292;
+  --radiant: rgba(255, 255, 255, 0.8);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  background: var(--background);
 }
 
 body {
+  margin: 0;
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #ffffff;
+  color: #000000;
+}
+
+a {
+  text-decoration: none;
+}
+
+/* =========================================
+   INTERNAL PAGE BACKGROUND
+========================================= */
+
+.dashboard-shell,
+.workspace-shell {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(
+      ellipse at 75% 5%,
+      rgba(255, 255, 255, 0.065),
+      transparent 36%
+    ),
+    radial-gradient(
+      ellipse at 10% 75%,
+      rgba(255, 255, 255, 0.035),
+      transparent 34%
+    ),
+    #070707;
+}
+
+.dashboard-shell::before,
+.workspace-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.2;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+/* =========================================
+   PREMIUM SURFACES
+========================================= */
+
+.premium-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(255, 255, 255, 0.075),
+      transparent 38%
+    ),
+    linear-gradient(145deg, #151515, #090909 72%);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.25);
+}
+
+.premium-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  background: linear-gradient(145deg, #141414, #090909);
+  transition:
+    transform 0.3s ease,
+    border-color 0.3s ease,
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.premium-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(255, 255, 255, 0.3);
+  background: linear-gradient(145deg, #1b1b1b, #0b0b0b);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.4);
+}
+
+/* =========================================
+   ROUTE / NETWORK DECORATION
+========================================= */
+
+.route-glow {
+  background:
+    radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.045) 35%,
+      transparent 70%
+    );
+}
+
+.route-line {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.75),
+    transparent
+  );
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+}
+
+.network-orbit {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 50%;
+}
+
+.network-orbit::before,
+.network-orbit::after {
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 50%;
+}
+
+.network-orbit::after {
+  inset: 25%;
+}
+
+/* =========================================
+   PREMIUM BUTTON SYSTEM
+========================================= */
+
+.premium-button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.25s ease,
+    background 0.25s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.premium-button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 0 12px rgba(255, 255, 255, 0.08),
+    0 0 28px rgba(255, 255, 255, 0.13);
+}
+
+.premium-button:active {
+  transform: scale(0.96);
+  box-shadow:
+    0 0 20px rgba(255, 255, 255, 0.25),
+    0 0 48px rgba(255, 255, 255, 0.16);
+}
+
+.premium-button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 4px;
+}
+
+/* =========================================
+   GLOBAL CLICK RADIANT BURST
+   Applied automatically to all buttons.
+========================================= */
+
+.dropnest-click-glow {
+  position: fixed;
+  z-index: 2147483647;
+  pointer-events: none;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background:
+    radial-gradient(
+      circle at var(--glow-x) var(--glow-y),
+      rgba(255, 255, 255, 0.65) 0%,
+      rgba(255, 255, 255, 0.28) 22%,
+      rgba(255, 255, 255, 0.1) 48%,
+      transparent 75%
+    );
+  box-shadow:
+    0 0 12px rgba(255, 255, 255, 0.28),
+    0 0 28px rgba(255, 255, 255, 0.2),
+    inset 0 0 18px rgba(255, 255, 255, 0.12);
+  animation: dropnest-global-click-burst 750ms ease-out forwards;
+}
+
+@keyframes dropnest-global-click-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+    filter: brightness(1);
+  }
+
+  25% {
+    opacity: 1;
+    filter: brightness(1.7);
+  }
+
+  65% {
+    opacity: 0.85;
+    transform: scale(1.04);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.13);
+    filter: brightness(1);
+  }
+}
+
+/* =========================================
+   PREMIUM INPUTS
+========================================= */
+
+.premium-input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  color: white;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.premium-input:focus {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.065);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.07);
+}
+
+/* =========================================
+   STATUS INDICATORS
+========================================= */
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.65);
+}
+
+.status-online {
+  background: #22c55e;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.55);
+}
+
+/* =========================================
+   CINEMATIC TRUCK ENTRANCE
+========================================= */
+
+@keyframes dropnest-truck-arrive {
+  0% {
+    transform: translate3d(110%, 0, 0) scale(1.04);
+    opacity: 0;
+    filter: blur(8px);
+  }
+
+  45% {
+    opacity: 1;
+    filter: blur(2px);
+  }
+
+  75% {
+    transform: translate3d(-2%, 0, 0) scale(1);
+    filter: blur(0);
+  }
+
+  88% {
+    transform: translate3d(1%, 0, 0) scale(1);
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.truck-enter {
+  animation: dropnest-truck-arrive 2.2s cubic-bezier(0.18, 0.72, 0.25, 1) both;
+  will-change: transform, opacity, filter;
+}
+
+/* =========================================
+   DARK LEAFLET MAP
+========================================= */
+
+.dropnest-dark-map {
+  position: relative;
+  background: #080808;
+  isolation: isolate;
+}
+
+.dropnest-dark-map .leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #080808;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.dropnest-dark-map .leaflet-tile {
+  filter:
+    invert(1)
+    hue-rotate(180deg)
+    brightness(0.78)
+    contrast(1.08)
+    saturate(0.55);
+}
+
+.dropnest-dark-map .leaflet-control-zoom {
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 10px !important;
+  overflow: hidden;
+}
+
+.dropnest-dark-map .leaflet-control-zoom a {
+  width: 34px !important;
+  height: 34px !important;
+  line-height: 34px !important;
+  background: #111111 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-bottom: 1px solid #333333 !important;
+}
+
+.dropnest-dark-map .leaflet-control-zoom a:hover {
+  background: #292929 !important;
+  color: #ffffff !important;
+}
+
+.dropnest-dark-map .leaflet-control-attribution {
+  background: rgba(0, 0, 0, 0.85) !important;
+  color: #999999 !important;
+  font-size: 9px !important;
+}
+
+.dropnest-dark-map .leaflet-control-attribution a {
+  color: #dddddd !important;
+}
+
+.dropnest-dark-map .leaflet-popup-content-wrapper,
+.dropnest-dark-map .leaflet-popup-tip {
+  background: #111111 !important;
+  color: #ffffff !important;
+  border: 1px solid #333333;
+}
+
+.dropnest-dark-map .leaflet-popup-content {
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.dropnest-dark-map .leaflet-popup-close-button {
+  color: #ffffff !important;
+}
+
+/* =========================================
+   SCROLLBAR
+========================================= */
+
+::-webkit-scrollbar {
+  width: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #383838;
+  border-radius: 20px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #666666;
+}
+
+/* =========================================
+   ACCESSIBILITY & RESPONSIVENESS
+========================================= */
+
+@media (max-width: 768px) {
+  .premium-panel {
+    border-radius: 18px;
+  }
+
+  .premium-card {
+    border-radius: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .truck-enter {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+
+  .dropnest-click-glow {
+    display: none;
+  }
 }
