@@ -1,10 +1,10 @@
-
 "use client";
 
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 type Transport = {
   id: string;
@@ -39,6 +39,7 @@ type Booking = {
   price: number;
   status: "Pending" | "Accepted" | "Completed" | "Cancelled";
   createdAt: string;
+  demo?: boolean;
 };
 
 const BOOKING_KEY = "dropnest_bookings";
@@ -159,6 +160,122 @@ const initialTransports: Transport[] = [
     verified: true,
     tag: "LIMITED SPACE",
   },
+
+  // BENGALURU LOCAL ROUTES
+  {
+    id: "DP-BLR-1101",
+    from: "Electronic City",
+    to: "Whitefield",
+    fromCode: "ELC",
+    toCode: "WFD",
+    distance: "Within Bengaluru",
+    date: "24 Nov 2026",
+    time: "08:00 AM",
+    vehicle: "Tata Motors",
+    vehicleType: "14 ft Truck",
+    capacity: 55,
+    available: "550 kg available",
+    price: 1800,
+    driver: "Naveen Kumar",
+    rating: "4.8",
+    verified: true,
+    tag: "BENGALURU LOCAL",
+  },
+  {
+    id: "DP-BLR-1102",
+    from: "Yelahanka",
+    to: "Jayanagar",
+    fromCode: "YLK",
+    toCode: "JYN",
+    distance: "Within Bengaluru",
+    date: "25 Nov 2026",
+    time: "09:00 AM",
+    vehicle: "Mahindra",
+    vehicleType: "Mini Truck",
+    capacity: 35,
+    available: "350 kg available",
+    price: 1200,
+    driver: "Karthik Rao",
+    rating: "4.7",
+    verified: true,
+    tag: "BENGALURU LOCAL",
+  },
+  {
+    id: "DP-BLR-1103",
+    from: "Hebbal",
+    to: "Koramangala",
+    fromCode: "HBL",
+    toCode: "KRM",
+    distance: "Within Bengaluru",
+    date: "26 Nov 2026",
+    time: "10:30 AM",
+    vehicle: "Eicher",
+    vehicleType: "14 ft Truck",
+    capacity: 45,
+    available: "450 kg available",
+    price: 1450,
+    driver: "Manoj Shetty",
+    rating: "4.9",
+    verified: true,
+    tag: "BENGALURU LOCAL",
+  },
+  {
+    id: "DP-BLR-1104",
+    from: "Rajajinagar",
+    to: "Marathahalli",
+    fromCode: "RJN",
+    toCode: "MRT",
+    distance: "Within Bengaluru",
+    date: "27 Nov 2026",
+    time: "07:30 AM",
+    vehicle: "Ashok Leyland",
+    vehicleType: "17 ft Truck",
+    capacity: 60,
+    available: "600 kg available",
+    price: 1650,
+    driver: "Prakash Hegde",
+    rating: "4.8",
+    verified: true,
+    tag: "BENGALURU LOCAL",
+  },
+  {
+    id: "DP-BLR-1105",
+    from: "BTM Layout",
+    to: "Indiranagar",
+    fromCode: "BTM",
+    toCode: "IDR",
+    distance: "Within Bengaluru",
+    date: "28 Nov 2026",
+    time: "11:00 AM",
+    vehicle: "Mahindra",
+    vehicleType: "Tempo",
+    capacity: 25,
+    available: "250 kg available",
+    price: 950,
+    driver: "Suresh Kumar",
+    rating: "4.6",
+    verified: true,
+    tag: "BENGALURU LOCAL",
+  },
+  {
+    id: "DP-BLR-1106",
+    from: "Banashankari",
+    to: "Manyata Tech Park",
+    fromCode: "BSK",
+    toCode: "MTP",
+    distance: "Within Bengaluru",
+    date: "29 Nov 2026",
+    time: "06:30 AM",
+    vehicle: "Tata Motors",
+    vehicleType: "20 ft Container",
+    capacity: 70,
+    available: "700 kg available",
+    price: 1900,
+    driver: "Arun Reddy",
+    rating: "4.8",
+    verified: true,
+    tag: "BENGALURU LOCAL",
+  },
 ];
 
 const formatPrice = (price: number) =>
@@ -178,6 +295,9 @@ export default function DropPoolPage() {
   const [showListingForm, setShowListingForm] = useState(false);
   const [message, setMessage] = useState("");
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
+  const [pickupContact, setPickupContact] = useState("");
+  const [deliveryContact, setDeliveryContact] = useState("");
+  const [isBooking, setIsBooking] = useState(false);
 
   const [listingForm, setListingForm] = useState({
     from: "",
@@ -190,19 +310,14 @@ export default function DropPoolPage() {
     time: "",
     driver: "",
   });
-
-  useEffect(() => {
+    useEffect(() => {
     try {
-      const savedListings = JSON.parse(
-        localStorage.getItem(LISTING_KEY) || "[]"
-      ) as Transport[];
-
-      const savedBookings = JSON.parse(
-        localStorage.getItem(BOOKING_KEY) || "[]"
-      ) as Booking[];
-
-      setListings(savedListings);
-      setMyBookings(savedBookings);
+      setListings(
+        JSON.parse(localStorage.getItem(LISTING_KEY) || "[]")
+      );
+      setMyBookings(
+        JSON.parse(localStorage.getItem(BOOKING_KEY) || "[]")
+      );
     } catch {
       setListings([]);
       setMyBookings([]);
@@ -246,11 +361,13 @@ export default function DropPoolPage() {
   function openBooking(item: Transport) {
     setSelected(item);
     setWeight("100");
+    setPickupContact("");
+    setDeliveryContact("");
     setMessage("");
   }
 
-  function confirmBooking() {
-    if (!selected) return;
+  async function confirmBooking() {
+    if (!selected || isBooking) return;
 
     const requestedWeight = Number(weight);
     const availableKg = Number.parseInt(selected.available, 10);
@@ -264,26 +381,154 @@ export default function DropPoolPage() {
       return;
     }
 
-    const booking: Booking = {
-      id: `BK-${Date.now()}`,
-      routeId: selected.id,
-      from: selected.from,
-      to: selected.to,
-      date: selected.date,
-      time: selected.time,
-      vehicle: selected.vehicleType,
-      driver: selected.driver,
-      weight: requestedWeight,
-      price: selected.price,
-      status: "Pending",
-      createdAt: new Date().toLocaleString(),
-    };
+    const cleanPickupContact = pickupContact.trim();
+    const cleanDeliveryContact = deliveryContact.trim();
 
-    const updated = [booking, ...myBookings];
+    if (!cleanPickupContact || !cleanDeliveryContact) {
+      setMessage("Enter both pickup and delivery contact numbers.");
+      return;
+    }
 
-    localStorage.setItem(BOOKING_KEY, JSON.stringify(updated));
-    setMyBookings(updated);
-    setMessage("Booking request saved successfully!");
+    setMessage("");
+
+    // Presentation fallback: save a clearly labelled demo booking locally.
+    if (!supabase) {
+      const demoBooking: Booking = {
+        id: `DEMO-${Date.now()}`,
+        routeId: selected.id,
+        from: selected.from,
+        to: selected.to,
+        date: selected.date,
+        time: selected.time,
+        vehicle: selected.vehicleType,
+        driver: selected.driver,
+        weight: requestedWeight,
+        price: selected.price,
+        status: "Pending",
+        createdAt: new Date().toLocaleString(),
+        demo: true,
+      };
+
+      const existingBookings = JSON.parse(
+        localStorage.getItem(BOOKING_KEY) || "[]"
+      ) as Booking[];
+
+      const updatedBookings = [demoBooking, ...existingBookings];
+
+      localStorage.setItem(
+        BOOKING_KEY,
+        JSON.stringify(updatedBookings)
+      );
+
+      setMyBookings(updatedBookings);
+      setMessage(
+        `Demo booking successful! Reference: ${demoBooking.id}`
+      );
+      setPickupContact("");
+      setDeliveryContact("");
+      return;
+    }
+
+    setIsBooking(true);
+
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError) throw sessionError;
+
+      if (!session?.access_token) {
+        setMessage("Please log in before placing a booking.");
+        return;
+      }
+
+      const parsedBookingDate = new Date(selected.date);
+
+      if (Number.isNaN(parsedBookingDate.getTime())) {
+        setMessage("Invalid departure date. Please select another route.");
+        return;
+      }
+
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          service_type: "transport",
+          pickup_address: selected.from,
+          destination_address: selected.to,
+          booking_date: parsedBookingDate.toISOString(),
+          amount: selected.price,
+          notes: [
+            `DropPool route ID: ${selected.id}`,
+            `Vehicle: ${selected.vehicle}`,
+            `Driver/provider: ${selected.driver}`,
+            `Departure time: ${selected.time}`,
+          ].join(" | "),
+          details: {
+            vehicle_type: selected.vehicleType,
+            goods_description: `Goods transport booking from ${selected.from} to ${selected.to}`,
+            goods_weight: requestedWeight,
+            pickup_contact: cleanPickupContact,
+            delivery_contact: cleanDeliveryContact,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || result.error || "Booking could not be saved."
+        );
+      }
+
+      const savedBooking = result.booking;
+
+      const booking: Booking = {
+        id: String(savedBooking.id),
+        routeId: selected.id,
+        from: selected.from,
+        to: selected.to,
+        date: selected.date,
+        time: selected.time,
+        vehicle: selected.vehicleType,
+        driver: selected.driver,
+        weight: requestedWeight,
+        price: selected.price,
+        status: "Pending",
+        createdAt: new Date().toLocaleString(),
+      };
+
+      const existingBookings = JSON.parse(
+        localStorage.getItem(BOOKING_KEY) || "[]"
+      ) as Booking[];
+
+      const updatedBookings = [booking, ...existingBookings];
+
+      localStorage.setItem(
+        BOOKING_KEY,
+        JSON.stringify(updatedBookings)
+      );
+
+      setMyBookings(updatedBookings);
+      setMessage("Booking request saved successfully!");
+      setPickupContact("");
+      setDeliveryContact("");
+    } catch (error) {
+      console.error("DropPool booking error:", error);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while saving your booking."
+      );
+    } finally {
+      setIsBooking(false);
+    }
   }
 
   function submitVehicleListing(
@@ -372,6 +617,7 @@ export default function DropPoolPage() {
               ["DropPool", "/pools", "↗"],
               ["Verified Nests", "/nests", "⌂"],
               ["NestLock", "/escrow", "◇"],
+              ["Payments", "/payments", "₹"],
               ["My Bookings", "/bookings", "▤"],
               ["My Profile", "/profile", "◉"],
             ].map(([name, href, icon]) => (
@@ -413,10 +659,22 @@ export default function DropPoolPage() {
             </span>
 
             <div className="flex items-center gap-4">
-              <Link href="/bookings" className="text-[10px] text-white/50 hover:text-white">
+              <Link
+                href="/payments"
+                className="text-[10px] text-white/50 hover:text-white"
+              >
+                Payments ↗
+              </Link>
+              <Link
+                href="/bookings"
+                className="text-[10px] text-white/50 hover:text-white"
+              >
                 My bookings ↗
               </Link>
-              <Link href="/profile" className="grid h-9 w-9 place-items-center rounded-full border border-white/20 bg-white/[0.08] text-xs">
+              <Link
+                href="/profile"
+                className="grid h-9 w-9 place-items-center rounded-full border border-white/20 bg-white/[0.08] text-xs"
+              >
                 D
               </Link>
             </div>
@@ -430,6 +688,7 @@ export default function DropPoolPage() {
                 ["DropPool", "/pools"],
                 ["Nests", "/nests"],
                 ["NestLock", "/escrow"],
+                ["Payments", "/payments"],
                 ["Bookings", "/bookings"],
               ].map(([name, href]) => (
                 <Link
@@ -475,10 +734,16 @@ export default function DropPoolPage() {
                   </p>
 
                   <div className="mt-8 flex flex-wrap gap-3">
-                    <a href="#discover" className="rounded-full bg-white px-6 py-3.5 text-xs font-semibold text-black hover:bg-white/80">
+                    <a
+                      href="#discover"
+                      className="rounded-full bg-white px-6 py-3.5 text-xs font-semibold text-black hover:bg-white/80"
+                    >
                       Discover available routes ↗
                     </a>
-                    <a href="#how-it-works" className="rounded-full border border-white/20 px-6 py-3.5 text-xs text-white/75 hover:bg-white/10">
+                    <a
+                      href="#how-it-works"
+                      className="rounded-full border border-white/20 px-6 py-3.5 text-xs text-white/75 hover:bg-white/10"
+                    >
                       How it works
                     </a>
                   </div>
@@ -492,11 +757,15 @@ export default function DropPoolPage() {
                     🚚
                   </div>
                   <div className="absolute right-0 top-4 rounded-xl border border-white/10 bg-[#151515]/90 px-4 py-3">
-                    <p className="text-[8px] tracking-[0.18em] text-white/40">AVAILABLE SPACE</p>
+                    <p className="text-[8px] tracking-[0.18em] text-white/40">
+                      AVAILABLE SPACE
+                    </p>
                     <p className="mt-1 text-lg font-semibold">680 kg</p>
                   </div>
                   <div className="absolute bottom-3 left-0 rounded-xl border border-white/10 bg-[#151515]/90 px-4 py-3">
-                    <p className="text-[8px] tracking-[0.18em] text-white/40">NETWORK</p>
+                    <p className="text-[8px] tracking-[0.18em] text-white/40">
+                      NETWORK
+                    </p>
                     <p className="mt-1 text-lg font-semibold">Shared journeys</p>
                   </div>
                 </div>
@@ -507,7 +776,10 @@ export default function DropPoolPage() {
             {message && (
               <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/[0.06] px-4 py-3 text-xs text-white/80">
                 <span>{message}</span>
-                <button onClick={() => setMessage("")} className="text-white/50">
+                <button
+                  onClick={() => setMessage("")}
+                  className="text-white/50"
+                >
                   ✕
                 </button>
               </div>
@@ -520,29 +792,40 @@ export default function DropPoolPage() {
                 ["₹", "Split transport costs", "Share transportation expenses with other users."],
                 ["◇", "Discover drivers", "Review driver and vehicle details before booking."],
               ].map(([icon, title, text]) => (
-                <div key={title} className="flex gap-4 rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5">
+                <div
+                  key={title}
+                  className="flex gap-4 rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5"
+                >
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/[0.04] text-lg">
                     {icon}
                   </span>
                   <div>
                     <h3 className="text-sm font-medium">{title}</h3>
-                    <p className="mt-2 text-[10px] leading-5 text-white/40">{text}</p>
+                    <p className="mt-2 text-[10px] leading-5 text-white/40">
+                      {text}
+                    </p>
                   </div>
                 </div>
               ))}
             </section>
-
-            {/* DISCOVER */}
+                        {/* DISCOVER */}
             <section id="discover" className="mt-16 scroll-mt-24">
               <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
                 <div>
-                  <p className="text-[9px] uppercase tracking-[0.28em] text-white/35">Explore the network</p>
-                  <h2 className="mt-3 text-3xl font-semibold tracking-tight">Find your next route.</h2>
+                  <p className="text-[9px] uppercase tracking-[0.28em] text-white/35">
+                    Explore the network
+                  </p>
+                  <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                    Find your next route.
+                  </h2>
                   <p className="mt-3 max-w-xl text-xs leading-6 text-white/45">
-                    Discover vehicle capacity, compare prices and choose a transport option that fits your journey.
+                    Discover vehicle capacity, compare prices and choose a
+                    transport option that fits your journey.
                   </p>
                 </div>
-                <span className="text-[10px] text-white/35">{filteredTransports.length} listings available</span>
+                <span className="text-[10px] text-white/35">
+                  {filteredTransports.length} listings available
+                </span>
               </div>
 
               {/* SEARCH AND FILTERS */}
@@ -554,14 +837,22 @@ export default function DropPoolPage() {
                     placeholder="Search origin, destination or vehicle..."
                     className="w-full rounded-xl border border-white/10 bg-[#050505] px-4 py-4 text-xs outline-none placeholder:text-white/30 focus:border-white/40"
                   />
-                  <button onClick={() => setShowFilters(!showFilters)} className="rounded-xl border border-white/15 px-5 py-3 text-xs text-white/70 hover:bg-white/10">
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="rounded-xl border border-white/15 px-5 py-3 text-xs text-white/70 hover:bg-white/10"
+                  >
                     {showFilters ? "Hide filters ↑" : "Filters +"}
                   </button>
                 </div>
 
                 {showFilters && (
                   <div className="mt-4 flex flex-wrap gap-2 border-t border-white/[0.08] pt-4">
-                    {["All routes", "Under ₹2,000", "High capacity", "Verified drivers"].map((item) => (
+                    {[
+                      "All routes",
+                      "Under ₹2,000",
+                      "High capacity",
+                      "Verified drivers",
+                    ].map((item) => (
                       <button
                         key={item}
                         onClick={() => setFilter(item)}
@@ -578,8 +869,14 @@ export default function DropPoolPage() {
                 )}
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-[9px] text-white/35">Filter by route, price, capacity or driver verification.</p>
-                  <select value={sort} onChange={(e) => setSort(e.target.value)} className="rounded-lg border border-white/10 bg-[#111] px-3 py-2 text-[10px] text-white/70 outline-none">
+                  <p className="text-[9px] text-white/35">
+                    Filter by route, price, capacity or driver verification.
+                  </p>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                    className="rounded-lg border border-white/10 bg-[#111] px-3 py-2 text-[10px] text-white/70 outline-none"
+                  >
                     <option value="recommended">Recommended</option>
                     <option value="price-low">Price: Low to high</option>
                     <option value="price-high">Price: High to low</option>
@@ -591,10 +888,17 @@ export default function DropPoolPage() {
               {/* TRANSPORT CARDS */}
               <div className="mt-6 grid gap-4 xl:grid-cols-2">
                 {filteredTransports.map((item) => (
-                  <article key={item.id} className="rounded-2xl border border-white/[0.09] bg-gradient-to-br from-[#131313] to-[#090909] p-5 transition hover:border-white/30 md:p-6">
+                  <article
+                    key={item.id}
+                    className="rounded-2xl border border-white/[0.09] bg-gradient-to-br from-[#131313] to-[#090909] p-5 transition hover:border-white/30 md:p-6"
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <span className="rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-[8px] tracking-[0.15em] text-white/65">{item.tag}</span>
-                      <span className="text-[9px] text-white/35">{item.id}</span>
+                      <span className="rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-[8px] tracking-[0.15em] text-white/65">
+                        {item.tag}
+                      </span>
+                      <span className="text-[9px] text-white/35">
+                        {item.id}
+                      </span>
                     </div>
 
                     <div className="mt-7 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
@@ -604,54 +908,90 @@ export default function DropPoolPage() {
                         <p className="mt-1 text-[9px] text-white/35">Origin</p>
                       </div>
                       <div className="min-w-[75px] text-center">
-                        <p className="text-[9px] text-white/40">{item.distance}</p>
+                        <p className="text-[9px] text-white/40">
+                          {item.distance}
+                        </p>
                         <div className="relative mt-3 flex items-center">
                           <div className="h-px w-full bg-white/20" />
-                          <span className="absolute left-1/2 -translate-x-1/2 bg-[#111] px-2 text-white/70">→</span>
+                          <span className="absolute left-1/2 -translate-x-1/2 bg-[#111] px-2 text-white/70">
+                            →
+                          </span>
                         </div>
-                        <p className="mt-3 text-[8px] tracking-[0.12em] text-white/35">ROUTE</p>
+                        <p className="mt-3 text-[8px] tracking-[0.12em] text-white/35">
+                          ROUTE
+                        </p>
                       </div>
                       <div className="text-right">
                         <p className="text-3xl font-semibold">{item.toCode}</p>
                         <p className="mt-2 text-xs text-white/65">{item.to}</p>
-                        <p className="mt-1 text-[9px] text-white/35">Destination</p>
+                        <p className="mt-1 text-[9px] text-white/35">
+                          Destination
+                        </p>
                       </div>
                     </div>
 
                     <div className="mt-7 grid grid-cols-2 gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-4 sm:grid-cols-4">
-                      <div><p className="text-[8px] text-white/35">VEHICLE</p><p className="mt-2 text-[10px]">{item.vehicle}</p></div>
-                      <div><p className="text-[8px] text-white/35">TYPE</p><p className="mt-2 text-[10px]">{item.vehicleType}</p></div>
-                      <div><p className="text-[8px] text-white/35">DEPARTURE</p><p className="mt-2 text-[10px]">{item.time}</p></div>
-                      <div><p className="text-[8px] text-white/35">DATE</p><p className="mt-2 text-[10px]">{item.date}</p></div>
+                      <div>
+                        <p className="text-[8px] text-white/35">VEHICLE</p>
+                        <p className="mt-2 text-[10px]">{item.vehicle}</p>
+                      </div>
+                      <div>
+                        <p className="text-[8px] text-white/35">TYPE</p>
+                        <p className="mt-2 text-[10px]">{item.vehicleType}</p>
+                      </div>
+                      <div>
+                        <p className="text-[8px] text-white/35">DEPARTURE</p>
+                        <p className="mt-2 text-[10px]">{item.time}</p>
+                      </div>
+                      <div>
+                        <p className="text-[8px] text-white/35">DATE</p>
+                        <p className="mt-2 text-[10px]">{item.date}</p>
+                      </div>
                     </div>
 
                     <div className="mt-6">
                       <div className="flex justify-between text-[9px]">
-                        <span className="text-white/45">Available vehicle capacity</span>
+                        <span className="text-white/45">
+                          Available vehicle capacity
+                        </span>
                         <span className="text-white/75">{item.available}</span>
                       </div>
                       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-                        <div className="h-full rounded-full bg-white/80" style={{ width: `${item.capacity}%` }} />
+                        <div
+                          className="h-full rounded-full bg-white/80"
+                          style={{ width: `${item.capacity}%` }}
+                        />
                       </div>
                     </div>
 
                     <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.08] pt-5">
                       <div className="flex items-center gap-3">
-                        <div className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/[0.06] text-sm">{item.driver.charAt(0)}</div>
+                        <div className="grid h-10 w-10 place-items-center rounded-full border border-white/15 bg-white/[0.06] text-sm">
+                          {item.driver.charAt(0)}
+                        </div>
                         <div>
                           <p className="text-xs font-medium">{item.driver}</p>
                           <p className="mt-1 text-[9px] text-white/45">
-                            {item.verified ? `★ ${item.rating} · Verified` : "Community listing · Not verified"}
+                            {item.verified
+                              ? `★ ${item.rating} · Verified`
+                              : "Community listing · Not verified"}
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-[8px] text-white/35">ESTIMATED PRICE</p>
-                        <p className="mt-1 text-xl font-semibold">{formatPrice(item.price)}</p>
+                        <p className="text-[8px] text-white/35">
+                          ESTIMATED PRICE
+                        </p>
+                        <p className="mt-1 text-xl font-semibold">
+                          {formatPrice(item.price)}
+                        </p>
                       </div>
                     </div>
 
-                    <button onClick={() => openBooking(item)} className="mt-6 w-full rounded-xl bg-white py-3.5 text-xs font-semibold text-black hover:bg-white/80">
+                    <button
+                      onClick={() => openBooking(item)}
+                      className="mt-6 w-full rounded-xl bg-white py-3.5 text-xs font-semibold text-black hover:bg-white/80"
+                    >
                       View details & book ↗
                     </button>
                   </article>
@@ -662,28 +1002,58 @@ export default function DropPoolPage() {
                 <div className="mt-6 rounded-2xl border border-white/10 bg-[#0b0b0b] p-12 text-center">
                   <p className="text-2xl">⌕</p>
                   <h3 className="mt-4 text-lg font-medium">No routes found.</h3>
-                  <p className="mt-2 text-xs text-white/40">Try another city or change your filters.</p>
-                  <button onClick={() => { setSearch(""); setFilter("All routes"); }} className="mt-5 rounded-full border border-white/20 px-5 py-2.5 text-xs">
+                  <p className="mt-2 text-xs text-white/40">
+                    Try another city or change your filters.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setSearch("");
+                      setFilter("All routes");
+                    }}
+                    className="mt-5 rounded-full border border-white/20 px-5 py-2.5 text-xs"
+                  >
                     Clear filters
                   </button>
                 </div>
               )}
             </section>
-
-            {/* HOW IT WORKS */}
-            <section id="how-it-works" className="mt-16 scroll-mt-24 rounded-2xl border border-white/[0.09] bg-[#0a0a0a] p-6 md:p-9">
-              <p className="text-[9px] uppercase tracking-[0.28em] text-white/35">The process</p>
-              <h2 className="mt-3 text-2xl font-semibold">From available space to shared journey.</h2>
+                        {/* HOW IT WORKS */}
+            <section
+              id="how-it-works"
+              className="mt-16 scroll-mt-24 rounded-2xl border border-white/[0.09] bg-[#0a0a0a] p-6 md:p-9"
+            >
+              <p className="text-[9px] uppercase tracking-[0.28em] text-white/35">
+                The process
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold">
+                From available space to shared journey.
+              </h2>
               <div className="mt-9 grid gap-8 md:grid-cols-3">
                 {[
-                  ["01", "Find a route", "Discover vehicles with available space travelling in your direction."],
-                  ["02", "Choose capacity", "Compare vehicle details, driver information and estimated price."],
-                  ["03", "Book your space", "Submit a booking request and track it through My Bookings."],
+                  [
+                    "01",
+                    "Find a route",
+                    "Discover vehicles with available space travelling in your direction.",
+                  ],
+                  [
+                    "02",
+                    "Choose capacity",
+                    "Compare vehicle details, driver information and estimated price.",
+                  ],
+                  [
+                    "03",
+                    "Book your space",
+                    "Submit a booking request and track it through My Bookings.",
+                  ],
                 ].map(([number, title, description]) => (
                   <div key={number}>
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/[0.04] text-xs">{number}</div>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/[0.04] text-xs">
+                      {number}
+                    </div>
                     <h3 className="mt-5 text-base font-semibold">{title}</h3>
-                    <p className="mt-3 text-xs leading-6 text-white/45">{description}</p>
+                    <p className="mt-3 text-xs leading-6 text-white/45">
+                      {description}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -692,14 +1062,22 @@ export default function DropPoolPage() {
             {/* PROVIDER CTA */}
             <section className="mt-8 flex flex-col justify-between gap-6 rounded-2xl border border-white/10 bg-gradient-to-r from-[#171717] to-[#080808] p-7 md:flex-row md:items-center md:p-9">
               <div>
-                <p className="text-[9px] uppercase tracking-[0.25em] text-white/40">For transport providers</p>
-                <h2 className="mt-3 text-2xl font-semibold">Have unused vehicle space?</h2>
+                <p className="text-[9px] uppercase tracking-[0.25em] text-white/40">
+                  For transport providers
+                </p>
+                <h2 className="mt-3 text-2xl font-semibold">
+                  Have unused vehicle space?
+                </h2>
                 <p className="mt-2 max-w-xl text-xs leading-6 text-white/45">
-                  List your route and let other users discover your available capacity.
+                  List your route and let other users discover your available
+                  capacity.
                 </p>
               </div>
               <button
-                onClick={() => { setMessage(""); setShowListingForm(true); }}
+                onClick={() => {
+                  setMessage("");
+                  setShowListingForm(true);
+                }}
                 className="w-fit shrink-0 rounded-full bg-white px-6 py-3.5 text-xs font-semibold text-black hover:bg-white/80"
               >
                 List your vehicle ↗
@@ -712,6 +1090,7 @@ export default function DropPoolPage() {
                 <Link href="/dashboard">Dashboard</Link>
                 <Link href="/nests">Verified Nests</Link>
                 <Link href="/escrow">NestLock</Link>
+                <Link href="/payments">Payments</Link>
               </div>
             </footer>
           </div>
@@ -730,10 +1109,19 @@ export default function DropPoolPage() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[9px] uppercase tracking-[0.25em] text-white/35">DropPool booking</p>
-                <h2 className="mt-3 text-2xl font-semibold">Review your journey.</h2>
+                <p className="text-[9px] uppercase tracking-[0.25em] text-white/35">
+                  DropPool booking
+                </p>
+                <h2 className="mt-3 text-2xl font-semibold">
+                  Review your journey.
+                </h2>
               </div>
-              <button onClick={() => setSelected(null)} className="grid h-9 w-9 place-items-center rounded-full border border-white/15 text-white/60">×</button>
+              <button
+                onClick={() => setSelected(null)}
+                className="grid h-9 w-9 place-items-center rounded-full border border-white/15 text-white/60"
+              >
+                ×
+              </button>
             </div>
 
             <div className="mt-7 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
@@ -742,39 +1130,110 @@ export default function DropPoolPage() {
                 <span className="text-[8px] text-white/60">{selected.tag}</span>
               </div>
               <div className="mt-6 flex items-center justify-between">
-                <div><p className="text-2xl font-semibold">{selected.fromCode}</p><p className="mt-1 text-[10px] text-white/45">{selected.from}</p></div>
+                <div>
+                  <p className="text-2xl font-semibold">{selected.fromCode}</p>
+                  <p className="mt-1 text-[10px] text-white/45">
+                    {selected.from}
+                  </p>
+                </div>
                 <span className="text-white/40">→</span>
-                <div className="text-right"><p className="text-2xl font-semibold">{selected.toCode}</p><p className="mt-1 text-[10px] text-white/45">{selected.to}</p></div>
+                <div className="text-right">
+                  <p className="text-2xl font-semibold">{selected.toCode}</p>
+                  <p className="mt-1 text-[10px] text-white/45">
+                    {selected.to}
+                  </p>
+                </div>
               </div>
               <div className="mt-6 grid grid-cols-2 gap-4 border-t border-white/10 pt-5">
-                <div><p className="text-[9px] text-white/35">VEHICLE</p><p className="mt-2 text-xs">{selected.vehicleType}</p></div>
-                <div><p className="text-[9px] text-white/35">DEPARTURE</p><p className="mt-2 text-xs">{selected.date} · {selected.time}</p></div>
-                <div><p className="text-[9px] text-white/35">DRIVER</p><p className="mt-2 text-xs">{selected.driver}</p></div>
-                <div><p className="text-[9px] text-white/35">CAPACITY</p><p className="mt-2 text-xs">{selected.available}</p></div>
+                <div>
+                  <p className="text-[9px] text-white/35">VEHICLE</p>
+                  <p className="mt-2 text-xs">{selected.vehicleType}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-white/35">DEPARTURE</p>
+                  <p className="mt-2 text-xs">
+                    {selected.date} · {selected.time}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-white/35">DRIVER</p>
+                  <p className="mt-2 text-xs">{selected.driver}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-white/35">CAPACITY</p>
+                  <p className="mt-2 text-xs">{selected.available}</p>
+                </div>
               </div>
             </div>
 
-            <label className="mt-6 block text-[10px] text-white/55">Approximate weight of your goods (kg)</label>
-            <input type="number" min="1" value={weight} onChange={(e) => setWeight(e.target.value)} className={inputClass} />
+            <label className="mt-6 block text-[10px] text-white/55">
+              Approximate weight of your goods (kg)
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              className={inputClass}
+            />
 
-            <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-5">
-              <div><p className="text-[9px] text-white/35">ESTIMATED PRICE</p><p className="mt-1 text-2xl font-semibold">{formatPrice(selected.price)}</p></div>
-              <span className="text-[9px] text-white/35">Sample listing price</span>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="block text-[10px] text-white/55">
+                Pickup contact number
+                <input
+                  type="tel"
+                  required
+                  value={pickupContact}
+                  onChange={(e) => setPickupContact(e.target.value)}
+                  placeholder="Enter pickup contact"
+                  className={inputClass}
+                />
+              </label>
+              <label className="block text-[10px] text-white/55">
+                Delivery contact number
+                <input
+                  type="tel"
+                  required
+                  value={deliveryContact}
+                  onChange={(e) => setDeliveryContact(e.target.value)}
+                  placeholder="Enter delivery contact"
+                  className={inputClass}
+                />
+              </label>
             </div>
 
-            {message && <p className="mt-4 text-xs text-white/75">{message}</p>}
+            <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-5">
+              <div>
+                <p className="text-[9px] text-white/35">ESTIMATED PRICE</p>
+                <p className="mt-1 text-2xl font-semibold">
+                  {formatPrice(selected.price)}
+                </p>
+              </div>
+              <span className="text-[9px] text-white/35">
+                Sample listing price
+              </span>
+            </div>
 
-            <button onClick={confirmBooking} className="mt-6 w-full rounded-xl bg-white py-4 text-xs font-semibold text-black hover:bg-white/80">
-              Save booking request ↗
+            {message && (
+              <p className="mt-4 text-xs text-white/75">{message}</p>
+            )}
+
+            <button
+              onClick={confirmBooking}
+              disabled={isBooking}
+              className="mt-6 w-full rounded-xl bg-white py-4 text-xs font-semibold text-black hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isBooking ? "Submitting booking..." : "Submit booking request ↗"}
             </button>
+
             <p className="mt-3 text-center text-[9px] leading-5 text-white/30">
-              Demo booking only. No payment or real transport reservation is created.
+              Demo mode stores this request in this browser only. No payment
+              or real transport reservation is created.
             </p>
           </div>
         </div>
       )}
-
-      {/* VEHICLE LISTING MODAL */}
+            {/* VEHICLE LISTING MODAL */}
       {showListingForm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
@@ -786,34 +1245,81 @@ export default function DropPoolPage() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[9px] uppercase tracking-[0.25em] text-white/35">Transport provider</p>
-                <h2 className="mt-3 text-2xl font-semibold">List your vehicle.</h2>
+                <p className="text-[9px] uppercase tracking-[0.25em] text-white/35">
+                  Transport provider
+                </p>
+                <h2 className="mt-3 text-2xl font-semibold">
+                  List your vehicle.
+                </h2>
                 <p className="mt-2 text-xs text-white/40">
-                  Share your available vehicle capacity with the DropNest network.
+                  Share your available vehicle capacity with the DropNest
+                  network.
                 </p>
               </div>
-              <button type="button" onClick={() => setShowListingForm(false)} className="grid h-9 w-9 place-items-center rounded-full border border-white/15 text-white/60">×</button>
+              <button
+                type="button"
+                onClick={() => setShowListingForm(false)}
+                className="grid h-9 w-9 place-items-center rounded-full border border-white/15 text-white/60"
+              >
+                ×
+              </button>
             </div>
 
-            <form onSubmit={submitVehicleListing} className="mt-7 grid gap-4 sm:grid-cols-2">
+            <form
+              onSubmit={submitVehicleListing}
+              className="mt-7 grid gap-4 sm:grid-cols-2"
+            >
               <label className="text-[10px] text-white/55">
                 Origin city
-                <input required value={listingForm.from} onChange={(e) => setListingForm({ ...listingForm, from: e.target.value })} placeholder="e.g. Bengaluru" className={inputClass} />
+                <input
+                  required
+                  value={listingForm.from}
+                  onChange={(e) =>
+                    setListingForm({ ...listingForm, from: e.target.value })
+                  }
+                  placeholder="e.g. Bengaluru"
+                  className={inputClass}
+                />
               </label>
 
               <label className="text-[10px] text-white/55">
                 Destination city
-                <input required value={listingForm.to} onChange={(e) => setListingForm({ ...listingForm, to: e.target.value })} placeholder="e.g. Chennai" className={inputClass} />
+                <input
+                  required
+                  value={listingForm.to}
+                  onChange={(e) =>
+                    setListingForm({ ...listingForm, to: e.target.value })
+                  }
+                  placeholder="e.g. Chennai"
+                  className={inputClass}
+                />
               </label>
 
               <label className="text-[10px] text-white/55">
                 Vehicle make / name
-                <input required value={listingForm.vehicle} onChange={(e) => setListingForm({ ...listingForm, vehicle: e.target.value })} placeholder="e.g. Tata Motors" className={inputClass} />
+                <input
+                  required
+                  value={listingForm.vehicle}
+                  onChange={(e) =>
+                    setListingForm({ ...listingForm, vehicle: e.target.value })
+                  }
+                  placeholder="e.g. Tata Motors"
+                  className={inputClass}
+                />
               </label>
 
               <label className="text-[10px] text-white/55">
                 Vehicle type
-                <select value={listingForm.vehicleType} onChange={(e) => setListingForm({ ...listingForm, vehicleType: e.target.value })} className={inputClass}>
+                <select
+                  value={listingForm.vehicleType}
+                  onChange={(e) =>
+                    setListingForm({
+                      ...listingForm,
+                      vehicleType: e.target.value,
+                    })
+                  }
+                  className={inputClass}
+                >
                   <option>Mini Truck</option>
                   <option>14 ft Truck</option>
                   <option>17 ft Truck</option>
@@ -825,34 +1331,86 @@ export default function DropPoolPage() {
 
               <label className="text-[10px] text-white/55">
                 Available capacity (kg)
-                <input required type="number" min="1" value={listingForm.capacity} onChange={(e) => setListingForm({ ...listingForm, capacity: e.target.value })} placeholder="e.g. 500" className={inputClass} />
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  value={listingForm.capacity}
+                  onChange={(e) =>
+                    setListingForm({
+                      ...listingForm,
+                      capacity: e.target.value,
+                    })
+                  }
+                  placeholder="e.g. 500"
+                  className={inputClass}
+                />
               </label>
 
               <label className="text-[10px] text-white/55">
                 Expected price (₹)
-                <input required type="number" min="1" value={listingForm.price} onChange={(e) => setListingForm({ ...listingForm, price: e.target.value })} placeholder="e.g. 2000" className={inputClass} />
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  value={listingForm.price}
+                  onChange={(e) =>
+                    setListingForm({ ...listingForm, price: e.target.value })
+                  }
+                  placeholder="e.g. 2000"
+                  className={inputClass}
+                />
               </label>
 
               <label className="text-[10px] text-white/55">
                 Departure date
-                <input required type="date" min={new Date().toISOString().split("T")[0]} value={listingForm.date} onChange={(e) => setListingForm({ ...listingForm, date: e.target.value })} className={inputClass} />
+                <input
+                  required
+                  type="date"
+                  min={new Date().toISOString().split("T")[0]}
+                  value={listingForm.date}
+                  onChange={(e) =>
+                    setListingForm({ ...listingForm, date: e.target.value })
+                  }
+                  className={inputClass}
+                />
               </label>
 
               <label className="text-[10px] text-white/55">
                 Departure time
-                <input required type="time" value={listingForm.time} onChange={(e) => setListingForm({ ...listingForm, time: e.target.value })} className={inputClass} />
+                <input
+                  required
+                  type="time"
+                  value={listingForm.time}
+                  onChange={(e) =>
+                    setListingForm({ ...listingForm, time: e.target.value })
+                  }
+                  className={inputClass}
+                />
               </label>
 
               <label className="text-[10px] text-white/55 sm:col-span-2">
                 Driver / provider name
-                <input required value={listingForm.driver} onChange={(e) => setListingForm({ ...listingForm, driver: e.target.value })} placeholder="Enter provider name" className={inputClass} />
+                <input
+                  required
+                  value={listingForm.driver}
+                  onChange={(e) =>
+                    setListingForm({ ...listingForm, driver: e.target.value })
+                  }
+                  placeholder="Enter provider name"
+                  className={inputClass}
+                />
               </label>
 
               <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-[10px] leading-5 text-white/40 sm:col-span-2">
-                Your listing will be stored in this browser for this prototype. It will be marked as a community listing, not a verified vehicle.
+                Your listing will be stored in this browser for this prototype.
+                It will be marked as a community listing, not a verified vehicle.
               </div>
 
-              <button type="submit" className="rounded-xl bg-white py-4 text-xs font-semibold text-black hover:bg-white/80 sm:col-span-2">
+              <button
+                type="submit"
+                className="rounded-xl bg-white py-4 text-xs font-semibold text-black hover:bg-white/80 sm:col-span-2"
+              >
                 Publish vehicle listing ↗
               </button>
             </form>

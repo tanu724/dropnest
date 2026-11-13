@@ -6,6 +6,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+type BookingStatus = "Pending" | "Accepted" | "Rejected" | "Completed";
+
 type ProviderBooking = {
   id: string;
   from: string;
@@ -16,10 +18,11 @@ type ProviderBooking = {
   time: string;
   weight: number;
   price: number;
-  status: "Pending" | "Accepted" | "Rejected" | "Completed";
+  status: BookingStatus;
 };
 
 const STORAGE_KEY = "dropnest_provider_bookings";
+const CUSTOMER_BOOKING_KEY = "dropnest_bookings";
 
 const demoBookings: ProviderBooking[] = [
   {
@@ -71,21 +74,86 @@ const navigation = [
 ];
 
 export default function ProviderPage() {
-  const [bookings, setBookings] = useState<ProviderBooking[]>(demoBookings);
+  const [bookings, setBookings] =
+    useState<ProviderBooking[]>(demoBookings);
+
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState("");
   const [available, setAvailable] = useState(true);
 
+  // Load provider requests and customer bookings.
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const savedProvider = JSON.parse(
+        localStorage.getItem(STORAGE_KEY) || "[]"
+      );
 
-      if (saved) {
-        setBookings(JSON.parse(saved) as ProviderBooking[]);
-      }
-    } catch {
+      const savedCustomerBookings = JSON.parse(
+        localStorage.getItem(CUSTOMER_BOOKING_KEY) || "[]"
+      );
+
+      const providerBookings: ProviderBooking[] = [
+        ...demoBookings,
+        ...(Array.isArray(savedProvider) ? savedProvider : []),
+      ];
+
+      const existingIds = new Set(
+        providerBookings.map((booking) => booking.id)
+      );
+
+      const customerRequests: ProviderBooking[] =
+        Array.isArray(savedCustomerBookings)
+          ? savedCustomerBookings
+              .filter(
+                (booking: Record<string, unknown>) =>
+                  booking.id &&
+                  !existingIds.has(String(booking.id))
+              )
+              .map((booking: Record<string, unknown>) => ({
+                id: String(booking.id),
+                from: String(booking.from || "Unknown"),
+                to: String(booking.to || "Unknown"),
+                customer: String(
+                  booking.customer ||
+                    booking.customerName ||
+                    "DropNest Customer"
+                ),
+                vehicle: String(
+                  booking.vehicle ||
+                    booking.vehicleType ||
+                    "Transport Vehicle"
+                ),
+                date: String(
+                  booking.date || "Date not specified"
+                ),
+                time: String(
+                  booking.time || "Time not specified"
+                ),
+                weight: Number(
+                  booking.weight ||
+                    booking.requestedWeight ||
+                    0
+                ),
+                price: Number(booking.price || 0),
+                status: "Pending" as const,
+              }))
+          : [];
+
+      const mergedBookings = [
+        ...providerBookings,
+        ...customerRequests,
+      ];
+
+      setBookings(mergedBookings);
+
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(mergedBookings)
+      );
+    } catch (error) {
+      console.error("Could not load provider bookings:", error);
       setNotice("Could not load saved provider activity.");
     }
 
@@ -94,15 +162,21 @@ export default function ProviderPage() {
 
   function saveBookings(updated: ProviderBooking[]) {
     setBookings(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(updated)
+    );
   }
 
   function updateStatus(
     id: string,
-    status: ProviderBooking["status"]
+    status: BookingStatus
   ) {
     const updated = bookings.map((booking) =>
-      booking.id === id ? { ...booking, status } : booking
+      booking.id === id
+        ? { ...booking, status }
+        : booking
     );
 
     saveBookings(updated);
@@ -127,22 +201,22 @@ export default function ProviderPage() {
   }, [bookings, filter, search]);
 
   const pending = bookings.filter(
-    (b) => b.status === "Pending"
+    (booking) => booking.status === "Pending"
   ).length;
 
   const accepted = bookings.filter(
-    (b) => b.status === "Accepted"
+    (booking) => booking.status === "Accepted"
   ).length;
 
   const completed = bookings.filter(
-    (b) => b.status === "Completed"
+    (booking) => booking.status === "Completed"
   ).length;
 
   const earnings = bookings
-    .filter((b) => b.status === "Completed")
-    .reduce((sum, b) => sum + b.price, 0);
+    .filter((booking) => booking.status === "Completed")
+    .reduce((sum, booking) => sum + booking.price, 0);
 
-  function statusStyle(status: ProviderBooking["status"]) {
+  function statusStyle(status: BookingStatus) {
     switch (status) {
       case "Pending":
         return "border-yellow-400/30 text-yellow-200";
@@ -276,7 +350,9 @@ export default function ProviderPage() {
                   <h1 className="mt-5 text-5xl font-semibold leading-[1.05] tracking-tight md:text-7xl">
                     Make every
                     <br />
-                    <span className="text-white/35">journey count.</span>
+                    <span className="text-white/35">
+                      journey count.
+                    </span>
                   </h1>
 
                   <p className="mt-5 max-w-xl text-sm leading-7 text-white/50">
@@ -505,26 +581,40 @@ export default function ProviderPage() {
                           <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
                             <div>
                               <p className="text-[8px] text-white/35">CUSTOMER</p>
-                              <p className="mt-2 text-[10px]">{booking.customer}</p>
+                              <p className="mt-2 text-[10px]">
+                                {booking.customer}
+                              </p>
                             </div>
                             <div>
                               <p className="text-[8px] text-white/35">VEHICLE</p>
-                              <p className="mt-2 text-[10px]">{booking.vehicle}</p>
+                              <p className="mt-2 text-[10px]">
+                                {booking.vehicle}
+                              </p>
                             </div>
                             <div>
-                              <p className="text-[8px] text-white/35">DATE & TIME</p>
-                              <p className="mt-2 text-[10px]">{booking.date}</p>
-                              <p className="mt-1 text-[9px] text-white/40">{booking.time}</p>
+                              <p className="text-[8px] text-white/35">
+                                DATE & TIME
+                              </p>
+                              <p className="mt-2 text-[10px]">
+                                {booking.date}
+                              </p>
+                              <p className="mt-1 text-[9px] text-white/40">
+                                {booking.time}
+                              </p>
                             </div>
                             <div>
                               <p className="text-[8px] text-white/35">LOAD</p>
-                              <p className="mt-2 text-[10px]">{booking.weight} kg</p>
+                              <p className="mt-2 text-[10px]">
+                                {booking.weight} kg
+                              </p>
                             </div>
                           </div>
                         </div>
 
                         <div className="border-t border-white/10 pt-4 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
-                          <p className="text-[8px] text-white/35">ROUTE VALUE</p>
+                          <p className="text-[8px] text-white/35">
+                            ROUTE VALUE
+                          </p>
                           <p className="mt-2 text-2xl font-semibold">
                             ₹{booking.price.toLocaleString("en-IN")}
                           </p>
